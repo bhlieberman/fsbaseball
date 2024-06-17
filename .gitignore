@@ -1,0 +1,5 @@
+.config
+.paket
+bin
+obj
+paket-files
