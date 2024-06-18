@@ -4,6 +4,7 @@ open System
 open System.Text.RegularExpressions
 
 open MoreTypes
+open StringExtensions
 
 /// This module contains the typed representation of the set of
 /// parameters accepted by the Statcast endpoint. See https://www.mlb.com/glossary/statcast
@@ -241,19 +242,84 @@ module SimpleTypes =
             | _ -> NoInput
 
     type Stadium =
-        // TODO: create a method that
-        // accepts an abbreviation or a full name
-        // and returns the corresponding value.
-        // Use `Map.ofList`?
         { venue: (string * string) option }
+        // TODO: determine if it's worthwhile to
+        // extend the mapping to use the integer values
+        // for the stadiums. It is not alphabetical.
+        // This could be quite tedious to reproduce.
+        static member private stadiums =
+            Map.ofList
+                [ ("AZ", "Chase Field")
+                  ("ATL", "Truist Park")
+                  ("ATL-2016", "Turner Field")
+                  ("BAL", "Oriole Park")
+                  ("BOS", "Fenway Park")
+                  ("CHC", "WrigleyField")
+                  ("CIN", "GABP")
+                  ("CLE", "Progressive Field")
+                  ("COL", "Coors Field")
+                  ("CWS", "Guaranteed Rate Fld")
+                  ("DET", "Comerica Park")
+                  ("FLA-2011", "Hard Rock Stadium")
+                  ("HOU", "Minute Maid Park")
+                  ("KC", "Kaufman Stadium")
+                  ("LAA", "Angel Stadium")
+                  ("LAD", "Dodger Stadium")
+                  ("MIA", "Marlins Park")
+                  ("MIL", "American Family Field")
+                  ("MIN", "Target Field")
+                  ("MIN-2009", "Metrodome")
+                  ("NYM", "Citi Field")
+                  ("NYM-2008", "Shea Stadium")
+                  ("NYY", "Yankee Stadium")
+                  ("OAK", "Oakland Coliseum")
+                  ("PHI", "Citizens Bank Park")
+                  ("PIT", "PNC Park")
+                  ("SD", "Petco Park")
+                  ("SEA", "T-Mobile Park")
+                  ("SF", "Oracle Park")
+                  ("STL", "Busch Stadium")
+                  ("TB", "Tropicana Field")
+                  ("TEX", "Globe Life Field")
+                  ("TEX-2019", "Globe Life Park")
+                  ("TOR", "Rogers Centre")
+                  ("WSH", "Nationals Park") ]
 
-        static member create =
-            function
-            | (abbrev: string, full: string) ->
-                if (String.length abbrev) >= 2 then
-                    { venue = Some(abbrev, full) }
-                else
-                    { venue = None }
+        static member private create(abbrev: string, full: string) =
+            if (String.length abbrev) >= 2 && String.length full > 0 then
+                { venue = Some(abbrev, full) }
+            else
+                { venue = None }
+
+        static member fromAbbrevOrFullName(?abbrev, ?fullName) =
+            let abbrev' =
+                match abbrev with
+                | (Some chars: string option) ->
+                    match Stadium.stadiums.TryFind(chars.ToUpper()) with
+                    | (Some v) -> v
+                    | None ->
+                        failwith
+                            $"""You entered: {chars}. This key does not exist.
+                            Consult the docstring for valid key names."""
+                | None -> ""
+
+            let fullName' =
+                match fullName with
+                | (Some name: string option) ->
+                    let reversed =
+                        Map.keys Stadium.stadiums |> Seq.zip (Map.values Stadium.stadiums) |> Map.ofSeq
+
+                    match Map.tryFind name reversed with
+                    | (Some v) -> v
+                    | None ->
+                        failwith
+                            $"""The full name you entered, {fullName}, did not match any existing value.
+                            Consult the docstring for a list of valid full stadium names."""
+                | _ -> ""
+
+            Stadium.create (abbrev', fullName')
+
+
 
     type PitchResult = // all cases covered.
         // TODO: handle value.ToString()
@@ -372,15 +438,20 @@ module SimpleTypes =
         | Right
 
     type QualityOfContact =
-        // TODO: make sure that the
-        // cases that are slash-separated on the website
-        // are correctly formatted in the query string.
         | Barrel
         | SolidContact
         | FlareBurner
         | PoorlyUnder
         | PoorlyTopped
         | PoorlyWeak
+
+        override this.ToString() =
+            match this with
+            | FlareBurner
+            | PoorlyTopped
+            | PoorlyUnder
+            | PoorlyWeak -> this.ToString().Slashes()
+            | _ -> this.ToString()
 
     type RunnersOn =
         // TODO: maybe try to add the ability
@@ -462,7 +533,7 @@ module SimpleTypes =
         | IsRookiePitcher
         | IsPassedBall
         | IsWildPitch
-        | IsEV50Batter // average of hardest 50% of batted balls 
+        | IsEV50Batter // average of hardest 50% of batted balls
         | IsEV50Pitcher // average of softest 50% of pitches
         | CompetitiveSwing
         | IsSword // https://www.mlb.com/glossary/statcast/sword
