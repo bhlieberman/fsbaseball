@@ -6,13 +6,21 @@ open System.Text.RegularExpressions
 open MoreTypes
 
 /// This module contains the typed representation of the set of
-/// parameters accepted by the Statcast endpoint.
+/// parameters accepted by the Statcast endpoint. See https://www.mlb.com/glossary/statcast
+/// for definitions of terms and constructors not identified explicitly in comments.
 module SimpleTypes =
+    // TODO: unless otherwise specified, remaining todos
+    // will be to correctly implement ToString on each type.
 
+    /// Represents the PT variable in the query string. Use one of the `select*`
+    /// static methods to choose the pitch types you want. A method will be
+    /// provided that creates a list of valid pitch types given one or more
+    /// "canonical" names of pitches: e.g. "forkball", "slider"
     type PitchType =
         | CU
         | KC
         | CS
+        | CH
         | SL
         | ST
         | SV
@@ -27,7 +35,26 @@ module SimpleTypes =
         | FA
         | IN
         | PO
+        | Fastball of PitchType list
+        | Offspeed of PitchType list
+        | CurveballGroup of PitchType list
+        | SliderGroup of PitchType list
+        | Breaking of PitchType list
+        | OtherPitches of PitchType list
         | NoInput
+
+        static member selectFastballs = Fastball [ FF; SI; FC ]
+        static member selectOffspeed = Offspeed [ CH; FS; FO; SC ]
+        static member selectCurves = CurveballGroup [ CU; KC; CS ]
+        static member selectSliders = SliderGroup [ SL; ST; SV ]
+
+        static member selectBreaking =
+            match (PitchType.selectCurves, PitchType.selectSliders) with
+            | (CurveballGroup curves, SliderGroup sliders) -> List.append curves sliders
+            | _ -> List.empty
+
+        static member selectOthers = OtherPitches [ EP; FA; IN; PO ]
+
 
         static member validateInput =
             function
@@ -60,7 +87,7 @@ module SimpleTypes =
                     | _ -> NoInput
             | _ -> NoInput
 
-    type PAResult =
+    type PAResult = // all cases covered.
         | Single
         | Double
         | Triple
@@ -132,7 +159,70 @@ module SimpleTypes =
         | BlueJays
         | Yankees
         | RedSox
-        | Rays // TODO: add the rest
+        | Rays
+        | Guardians
+        | Royals
+        | Tigers
+        | Twins
+        | WhiteSox
+        | Angels
+        | Astros
+        | Athletics
+        | Mariners
+        | Rangers
+        | Braves
+        | Marlins
+        | Mets
+        | Nationals
+        | Phillies
+        | Brewers
+        | Cardinals
+        | Cubs
+        | Pirates
+        | Reds
+        | DBacks
+        | Dodgers
+        | Giants
+        | Padres
+        | Rockies
+        | AmericanLeague of Team list
+        | NationalLeague of Team list
+
+        static member americanLeague =
+            AmericanLeague
+                [ Orioles
+                  BlueJays
+                  RedSox
+                  Yankees
+                  Rays
+                  Guardians
+                  Royals
+                  Tigers
+                  Twins
+                  WhiteSox
+                  Angels
+                  Astros
+                  Athletics
+                  Mariners
+                  Rangers ]
+
+        static member nationalLeague =
+            NationalLeague
+                [ Braves
+                  Marlins
+                  Mets
+                  Nationals
+                  Phillies
+                  Brewers
+                  Cardinals
+                  Cubs
+                  Pirates
+                  Reds
+                  DBacks
+                  Dodgers
+                  Giants
+                  Padres
+                  Rockies ]
 
     /// Whether the team is playing at home or away.
     type HomeAway = // DONE
@@ -151,6 +241,10 @@ module SimpleTypes =
             | _ -> NoInput
 
     type Stadium =
+        // TODO: create a method that
+        // accepts an abbreviation or a full name
+        // and returns the corresponding value.
+        // Use `Map.ofList`?
         { venue: (string * string) option }
 
         static member create =
@@ -161,7 +255,8 @@ module SimpleTypes =
                 else
                     { venue = None }
 
-    type PitchResult =
+    type PitchResult = // all cases covered.
+        // TODO: handle value.ToString()
         | Ball
         | BallInDirt
         | CalledStrike
@@ -201,7 +296,8 @@ module SimpleTypes =
         static member inZone = seq { 1..9 }
         static member outOfZone = seq { 11..14 }
 
-    type BattedBallLocation =
+    type BattedBallLocation = // all cases covered.
+        // TODO: handle value.ToString()
         | Pitcher
         | Catcher
         | FirstBase
@@ -226,20 +322,16 @@ module SimpleTypes =
         | Opposite
 
     type Count =
-        { count: string option } // because plain type synonyms can't have member functions...
+        { count: string option }
 
         static member create(balls: int, strikes: int) =
             if balls <= 3 && strikes <= 2 then
-                Some(balls.ToString() + "-" + strikes.ToString())
+                { count = Some(balls.ToString() + "-" + strikes.ToString()) }
             else
-                None
+                { count = None }
 
-    // member _.createStr: string list = // WIP
-    //     function
-    //     | "behind"
-    //     | "ahead"
-    //     | "2strikes"
-    //     | "3balls"
+        static member create(input: string list) : string = // TODO: consider whether this should be instance method
+            Seq.fold2 (fun acc v delim -> acc + v + delim) "" input (Seq.replicate (List.length input) "|")
 
     type Season =
         { value: int seq }
@@ -269,7 +361,7 @@ module SimpleTypes =
 
     type Outs = int list
 
-    type Opponent = string list // ... or Team list
+    type Opponent = Team list
 
     type PitcherHandedness =
         | Left
@@ -280,6 +372,9 @@ module SimpleTypes =
         | Right
 
     type QualityOfContact =
+        // TODO: make sure that the
+        // cases that are slash-separated on the website
+        // are correctly formatted in the query string.
         | Barrel
         | SolidContact
         | FlareBurner
@@ -288,6 +383,9 @@ module SimpleTypes =
         | PoorlyWeak
 
     type RunnersOn =
+        // TODO: maybe try to add the ability
+        // to search for players on each base by name,
+        // as provided by API.
         | NoRunners
         | RISP
         | RunnerOnBase
@@ -298,11 +396,21 @@ module SimpleTypes =
         | RunnerNotOnSecond
         | RunnerNotOnThird
 
+        static member getRunnerOnFirst = RunnerOnFirst [ RunnerNotOnSecond; RunnerNotOnThird ]
+
+        static member getRunnerOnSecond = RunnerOnSecond [ RunnerNotOnFirst; RunnerNotOnThird ]
+
+        static member getRunnerOnThird = RunnerOnThird [ RunnerNotOnFirst; RunnerNotOnSecond ]
+
     type Position =
         | PlayerType
         | DH
+        | SP // starting pitcher
+        | RP // relief pitcher
         | Outfield
         | Infield
+
+    // TODO: implement type MetricRange
 
     type InfieldAlignment =
         | Standard
@@ -345,7 +453,7 @@ module SimpleTypes =
         | IsHardHit
         | IsBunt
         | IsLastPitch
-        | IsSweetSpot
+        | IsSweetSpot // https://www.mlb.com/glossary/statcast/sweet-spot
         | PosPlayerPitching
         | RemoveBunts
         | StartingPosPlayer
@@ -354,14 +462,15 @@ module SimpleTypes =
         | IsRookiePitcher
         | IsPassedBall
         | IsWildPitch
-        | IsEV50Batter
-        | IsEV50Pitcher
+        | IsEV50Batter // average of hardest 50% of batted balls 
+        | IsEV50Pitcher // average of softest 50% of pitches
         | CompetitiveSwing
-        | IsSword
-        | IsBlast
+        | IsSword // https://www.mlb.com/glossary/statcast/sword
+        | IsBlast // https://www.mlb.com/glossary/statcast/bat-tracking-blasts
         | IsSquaredUp
 
     type MinPA = int
+    type MinPitches = int
     type MinResults = int
     type MinTotalPitches = int
 

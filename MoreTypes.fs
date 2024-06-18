@@ -5,6 +5,7 @@ open System.Text
 
 /// Extension to Types.fs that contains search/filter metadata typedefs.
 module MoreTypes =
+    // TODO: see todo at module level of Types.fs
 
     type GroupBy =
         | PlayerName
@@ -28,7 +29,7 @@ module MoreTypes =
         | Desc
         | Asc
 
-    type SortBy =
+    type SortBy = // TODO: verify correctness of this implementation.
         | Pitches
         | PitchPercentage
         | BA of string
