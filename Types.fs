@@ -147,6 +147,18 @@ module SimpleTypes =
         | LessThan of DateOnly
         | GreaterThan of DateOnly
 
+        static member private create'(lt: DateOnly, gt: DateOnly) =
+            let lt' =
+                if lt <= gt then
+                    LessThan lt
+                else
+                    failwith "You provided a lower bound that exceeds the upper bound."
+
+            let gt' = GreaterThan gt
+            (lt', gt')
+
+        static member create(lt: DateOnly, gt: DateOnly) = GameDate.create' (lt, gt)
+
         override this.ToString() =
             match this with
             | (LessThan v)
@@ -166,22 +178,22 @@ module SimpleTypes =
                 if date.Month.Equals(5) then
                     date.Month.ToString()
                 else
-                    raise (ArgumentException("This date is not in May."))
+                    raise <| ArgumentException "This date is not in May."
             | (Jun date) ->
                 if date.Month.Equals(6) then
                     date.Month.ToString()
                 else
-                    raise (ArgumentException("This date is not in June."))
+                    raise <| ArgumentException "This date is not in June."
             | (Jul date) ->
                 if date.Month.Equals(7) then
                     date.Month.ToString()
                 else
-                    raise (ArgumentException("This date is not in July."))
+                    raise <| ArgumentException "This date is not in July."
             | (Aug date) ->
                 if date.Month.Equals(8) then
                     date.Month.ToString()
                 else
-                    raise (ArgumentException("This date is not in August."))
+                    raise <| ArgumentException "This date is not in August."
             | MarApr -> (new DateOnly(2024, 4, 1)).Month.ToString()
             | SepOct -> (new DateOnly(2024, 9, 1)).Month.ToString()
 
@@ -260,11 +272,11 @@ module SimpleTypes =
         | Home of string
         | Away of string
 
-        member this.validateInput() =
+        member this.validateInput() = // shouldn't this be static?
             match this with
             | (Home input)
             | (Away input) ->
-                let normalized = input.ToLower() in
+                let normalized = input.ToLower().Trim() in
 
                 if Regex.Match(normalized, "^home$").Success then
                     Some this
@@ -388,7 +400,7 @@ module SimpleTypes =
 
         static member swingAndMiss = SwingAndMiss [ FoulTip; SwingingStrike; SwingingStrikeBlocked ]
 
-    type GamedayZones =
+    type GamedayZones = // hfZ -- pipe-delimited ints
         { zones: int list }
 
         static member inZone = seq { 1..9 }
@@ -406,7 +418,7 @@ module SimpleTypes =
         | CenterField
         | RightField
 
-    type AttackZones =
+    type AttackZones = // hfNewZones -- pipe-delimited ints
         { zones: int list }
 
         static member heart = seq { 1..9 }
@@ -428,9 +440,6 @@ module SimpleTypes =
             else
                 { count = None }
 
-        static member create(input: string list) : string = // TODO: consider whether this should be instance method
-            Seq.fold2 (fun acc v delim -> acc + v + delim) "" input (Seq.replicate (List.length input) "|")
-
     type Season =
         { value: int seq }
 
@@ -441,9 +450,18 @@ module SimpleTypes =
     type Situation =
         | GoAheadPlate
         | GoAheadOnBase
-        | TyingRunPlate
+        | TyingRunAtPlate
         | TyingRunOnBase
         | TyingRunOnDeck
+
+        override this.ToString() =
+            match this with
+            | GoAheadPlate -> "Go\.\.Ahead\.run\.at\.plate"
+            | GoAheadOnBase -> "Go\.\.Ahead\.run\.on\.base"
+            | TyingRunAtPlate
+            | TyingRunOnBase
+            | TyingRunOnDeck -> this.ToString().DotDot()
+
 
     type PlayerType =
         | Pitcher
@@ -461,13 +479,17 @@ module SimpleTypes =
 
     type Opponent = Team list
 
-    type PitcherHandedness =
-        | Left
-        | Right
+    type Handedness =
+        | Left // L
+        | Right // R
 
-    type BatterHandedness =
-        | Left
-        | Right
+    let mkHandedness (s: string) =
+        match s.Trim().ToLower() with
+        | "left"
+        | "l" -> Left
+        | "right"
+        | "r" -> Right
+        | _ -> failwith "Please provide one of the following values: 'left', 'L', 'right', 'R'"
 
     type QualityOfContact =
         | Barrel
@@ -492,12 +514,12 @@ module SimpleTypes =
         | NoRunners
         | RISP
         | RunnerOnBase
-        | RunnerOnFirst of RunnersOn list
-        | RunnerOnSecond of RunnersOn list
-        | RunnerOnThird of RunnersOn list
-        | RunnerNotOnFirst
-        | RunnerNotOnSecond
-        | RunnerNotOnThird
+        | RunnerOnFirst of RunnersOn list // [1; 6; 8]
+        | RunnerOnSecond of RunnersOn list // [2; 5; 8]
+        | RunnerOnThird of RunnersOn list // [3; 6; 7]
+        | RunnerNotOnFirst // 6
+        | RunnerNotOnSecond // 7
+        | RunnerNotOnThird // 8
 
         static member getRunnerOnFirst = RunnerOnFirst [ RunnerNotOnSecond; RunnerNotOnThird ]
 
@@ -506,12 +528,20 @@ module SimpleTypes =
         static member getRunnerOnThird = RunnerOnThird [ RunnerNotOnFirst; RunnerNotOnSecond ]
 
     type Position =
-        | PlayerType
-        | DH
+        | P // 1
+        | C // 2
+        | FirstBase // 3
+        | SecondBase // 4
+        | ThirdBase // 5
+        | SS // 6
+        | LF // 7
+        | CF // 8
+        | RF // 9
+        | DH // 10
         | SP // starting pitcher
         | RP // relief pitcher
-        | Outfield
-        | Infield
+        | Outfield // OF
+        | Infield // IF
 
     // TODO: implement type MetricRange
 
@@ -577,26 +607,23 @@ module SimpleTypes =
     type MinResults = int
     type MinTotalPitches = int
 
+    let mkPipeDelim (ls: 'a list) : string =
+        (String.Empty, ls, (Seq.replicate (List.length ls) "|"))
+        |||> Seq.fold2 (fun acc item delim -> acc + item.ToString() + delim)
+
+
     type QueryParams =
         { pitchType: PitchType list
           atBats: int
-          gameType: GameType
+          gameType: GameType list
           gameDateLT: GameDate
           gameDateGT: GameDate }
 
         member this.ToQueryString() =
             seq {
-                yield!
-                    seq {
-                        Seq.fold2
-                            (fun acc pt delim -> acc + pt.ToString() + delim)
-                            ""
-                            this.pitchType
-                            (Seq.replicate (List.length this.pitchType) "|")
-                    }
-
-                yield ("&AB=" + this.atBats.ToString())
-                yield ("&GT=" + this.gameType.ToString())
+                yield ("hfPT=" + mkPipeDelim this.pitchType)
+                yield ("&hfAB=" + this.atBats.ToString())
+                yield ("&hfGT=" + mkPipeDelim this.gameType)
                 yield ("&game_date_lt=" + this.gameDateLT.ToString())
                 yield ("&game_date_gt=" + this.gameDateGT.ToString())
             }
