@@ -16,3 +16,7 @@ module Scratch =
         let queryString = "hfPT=SL|&game_date_lt=2024-06-02&game_date_gt=2024-06-02"
         in (baseUrl + queryString) 
         |> Statcast.Load
+
+    [<EntryPoint>]
+    let main argv =
+        0
