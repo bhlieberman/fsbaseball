@@ -84,7 +84,28 @@ type TypesTest() =
     member _.checkHomeAway() =
         let home = Home "home"
         let away = Away "notAway"
-        let actualHome = home.validateInput()
-        let actualAway = away.validateInput()
+        let actualHome = home.validateInput ()
+        let actualAway = away.validateInput ()
         Assert.AreEqual(Some home, actualHome)
         Assert.AreNotEqual(Some away, actualAway)
+
+    [<Test>]
+    member _.checkQueryString() =
+        let pitchTypes = [ CS; CU; FS ]
+        let pitchTypes2 = FC
+        let atBats = 13
+        let gameType = [ Wildcard; WorldSeries; RegularSeason ]
+        let gameDateLT = LessThan(new DateOnly(2024, 6, 17))
+        let gameDateGT = GreaterThan(new DateOnly(2024, 6, 17))
+
+        let qp =
+            { pitchType = pitchTypes
+              atBats = atBats
+              gameType = gameType
+              gameDateLT = gameDateLT
+              gameDateGT = gameDateGT }
+
+        let expected =
+            "hfPT=CS|CU|FS|&hfAB=13&hfGT=F|W|R|&game_date_lt=2024-06-17&game_date_gt=2024-06-17"
+
+        Assert.That((fun _ -> qp.ToQueryString().Equals(expected)))
