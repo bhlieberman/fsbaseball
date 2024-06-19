@@ -1,22 +1,24 @@
 ﻿namespace Statcast
 
-open FSharp.Data
+open Player
+open SimpleTypes
+open System
 
 module Scratch =
 
-    let baseUrl = "https://baseballsavant.mlb.com/statcast_search/csv?"
+    let pitchTypes = [ CS; CU; FS ]
+    let pitchTypes2 = FC
+    let gameType = [ RegularSeason ]
+    let gameDateLT = LessThan(new DateOnly(2024, 6, 17))
+    let gameDateGT = GreaterThan(new DateOnly(2024, 6, 17))
 
-    [<Literal>]
-    let sampleUrl =
-        "https://baseballsavant.mlb.com/statcast_search/csv?hfPT=CU|KC|CS|SL|ST|SV|KN|&hfAB=&hfGT=R|&hfPR=&hfZ=&hfStadium=&hfBBL=&hfNewZones=&hfPull=&hfC=&hfSea=2024|&hfSit=&player_type=pitcher&hfOuts=&hfOpponent=&pitcher_throws=&batter_stands=&hfSA=&game_date_gt=2024-06-02&game_date_lt=2024-06-03&hfMo=&hfTeam=BAL|&home_road=&hfRO=&position=&hfInfield=&hfOutfield=&hfInn=&hfBBT=&hfFlag=&metric_1=&group_by=name&min_pitches=0&min_results=0&min_pas=0&sort_col=pitches&player_event_sort=api_p_release_speed&sort_order=desc#results"
-
-    type Statcast = CsvProvider<sampleUrl>
-
-    let sampleQuery = 
-        let queryString = "hfPT=SL|&game_date_lt=2024-06-02&game_date_gt=2024-06-02"
-        in (baseUrl + queryString) 
-        |> Statcast.Load
+    let qp =
+        { pitchType = pitchTypes
+          gameType = gameType
+          gameDateLT = gameDateLT
+          gameDateGT = gameDateGT }
 
     [<EntryPoint>]
     let main argv =
+        runAll (splitWork qp)
         0
