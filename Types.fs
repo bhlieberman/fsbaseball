@@ -85,14 +85,16 @@ module SimpleTypes =
                     | "eephus" -> EP
                     | "other" -> FA
                     | "pitchout" -> PO
-                    | _ -> NoInput
+                    | _ -> NoInput // TODO: think about replacing this with None
             | _ -> NoInput
 
+    /// All cases that are space-delimited in English (here in PascalCase)
+    /// are separated by '\\.\\.' in the query string.
     type PAResult = // all cases covered.
-        | Single
-        | Double
-        | Triple
-        | HomeRun
+        | Single // hits 1
+        | Double // hits 2
+        | Triple // hits 3
+        | HomeRun // hits 4 -- "home\.\.run" in query string
         | FieldOut
         | Strikeout
         | StrikeoutDoublePlay
@@ -115,10 +117,10 @@ module SimpleTypes =
         | SacFly
         | SacFlyDoublePlay
         | TriplePlay
-        | BaseHit of PAResult list
+        | BaseHit of PAResult list // TODO: write test cases for these recursive type constructors
         | Outs of PAResult list
 
-    type GameType =
+    type GameType = // pipe-delimited type
         | RegularSeason
         | PostSeason
         | Playoffs
@@ -128,6 +130,18 @@ module SimpleTypes =
         | WorldSeries
         | SpringTraining
         | AllStar
+
+        override this.ToString() =
+            match this with
+            | RegularSeason -> "R"
+            | Playoffs -> "PO"
+            | DivisionSeries -> "D"
+            | LeagueChampionship -> "L"
+            | SpringTraining -> "S"
+            | WorldSeries -> "W"
+            | Wildcard -> "F"
+            | AllStar -> "A"
+            | _ -> ""
 
     type GameDate = // DONE
         | LessThan of DateOnly
@@ -148,44 +162,60 @@ module SimpleTypes =
 
         override this.ToString() =
             match this with
-            | (May date)
-            | (Jun date)
-            | (Jul date)
-            | (Aug date) -> date.Month.ToString()
+            | (May date) ->
+                if date.Month.Equals(5) then
+                    date.Month.ToString()
+                else
+                    raise (ArgumentException("This date is not in May."))
+            | (Jun date) ->
+                if date.Month.Equals(6) then
+                    date.Month.ToString()
+                else
+                    raise (ArgumentException("This date is not in June."))
+            | (Jul date) ->
+                if date.Month.Equals(7) then
+                    date.Month.ToString()
+                else
+                    raise (ArgumentException("This date is not in July."))
+            | (Aug date) ->
+                if date.Month.Equals(8) then
+                    date.Month.ToString()
+                else
+                    raise (ArgumentException("This date is not in August."))
             | MarApr -> (new DateOnly(2024, 4, 1)).Month.ToString()
             | SepOct -> (new DateOnly(2024, 9, 1)).Month.ToString()
 
-    type Team =
-        | Orioles
-        | BlueJays
-        | Yankees
-        | RedSox
-        | Rays
-        | Guardians
-        | Royals
-        | Tigers
-        | Twins
-        | WhiteSox
-        | Angels
-        | Astros
-        | Athletics
-        | Mariners
-        | Rangers
-        | Braves
-        | Marlins
-        | Mets
-        | Nationals
-        | Phillies
-        | Brewers
-        | Cardinals
-        | Cubs
-        | Pirates
-        | Reds
-        | DBacks
-        | Dodgers
-        | Giants
-        | Padres
-        | Rockies
+    type Team = // I think these need to handled like...
+        | Orioles // BAL
+        | BlueJays // TOR
+        | Yankees // NYY
+        | RedSox // BOS
+        | Rays // not sure
+        | Guardians // CLE
+        | Royals // KC
+        | Tigers // DET
+        | Twins // MIN
+        | WhiteSox // CWS
+        | Angels // LAA
+        | Astros // HOU
+        | Athletics // OAK
+        | Mariners // SEA
+        | Rangers // TEX
+        | Braves // ATL
+        | Marlins // MIA
+        | Mets // NYM
+        | Nationals // WAS
+        | Phillies // PHI
+        | Brewers // MIL
+        | Cardinals // STL
+        | Cubs // CHC
+        | Pirates // PIT
+        | Reds // CIN
+        | DBacks // AZ
+        | Dodgers // LAD
+        | Giants // SF
+        | Padres // SD
+        | Rockies // COL
         | AmericanLeague of Team list
         | NationalLeague of Team list
 
@@ -227,26 +257,28 @@ module SimpleTypes =
 
     /// Whether the team is playing at home or away.
     type HomeAway = // DONE
-        | Home
-        | Away
-        | NoInput
+        | Home of string
+        | Away of string
 
-        member _.validateInput() =
-            function
-            | (Some input: string option) ->
+        member this.validateInput() =
+            match this with
+            | (Home input)
+            | (Away input) ->
                 let normalized = input.ToLower() in
 
-                if Regex.Match(normalized, "^home$").Success then Home
-                elif Regex.Match(normalized, "^away$").Success then Away
-                else NoInput
-            | _ -> NoInput
+                if Regex.Match(normalized, "^home$").Success then
+                    Some this
+                elif Regex.Match(normalized, "^away$").Success then
+                    Some this
+                else
+                    None
 
     type Stadium =
         { venue: (string * string) option }
         // TODO: determine if it's worthwhile to
         // extend the mapping to use the integer values
         // for the stadiums. It is not alphabetical.
-        // This could be quite tedious to reproduce.
+        // This could be quite tedious to reproduce·
         static member private stadiums =
             Map.ofList
                 [ ("AZ", "Chase Field")
