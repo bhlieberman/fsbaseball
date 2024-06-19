@@ -8,13 +8,13 @@ open System.Text.RegularExpressions
 /// stringified record values to snake_case for use
 /// in the Statcast URL.
 module StringExtensions =
+    let private words = new Regex("(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
+
     type String with
         member this.ToURLCase() =
-            let words = Regex.Split(this, "(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-            let lowerCased = words |> Seq.map (fun s -> s.ToLower()) |> Seq.toArray
+            let lowerCased = words.Split(this) |> Seq.map (fun s -> s.ToLower()) |> Seq.toArray
             String.Join("_", lowerCased)
 
-        member this.Slashes() =
-            let words = Regex.Split(this, "(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
-            String.Join("/", words)
+        member this.Slashes() = String.Join("/", words.Split(this))
 
+        member this.DotDot() = String.Join("\.\.", words.Split(this))
