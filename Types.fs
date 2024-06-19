@@ -90,7 +90,7 @@ module SimpleTypes =
 
     /// All cases that are space-delimited in English (here in PascalCase)
     /// are separated by '\\.\\.' in the query string.
-    type PAResult = // all cases covered.
+    type PAResult = // corresponded to hfAB parameter
         | Single // hits 1
         | Double // hits 2
         | Triple // hits 3
@@ -172,28 +172,19 @@ module SimpleTypes =
         | Aug of DateOnly
         | SepOct // coded as 9
 
+        static member create(d: DateOnly) =
+            match d.Month with
+            | 4 -> MarApr
+            | 5 -> May d
+            | 6 -> Jun d
+            | 7 -> Jul d
+            | 8 -> Aug d
+            | 9 -> SepOct
+            | _ -> raise <| ArgumentException "The date provided is not within a typical baseball season."
+
         override this.ToString() =
             match this with
-            | (May date) ->
-                if date.Month.Equals(5) then
-                    date.Month.ToString()
-                else
-                    raise <| ArgumentException "This date is not in May."
-            | (Jun date) ->
-                if date.Month.Equals(6) then
-                    date.Month.ToString()
-                else
-                    raise <| ArgumentException "This date is not in June."
-            | (Jul date) ->
-                if date.Month.Equals(7) then
-                    date.Month.ToString()
-                else
-                    raise <| ArgumentException "This date is not in July."
-            | (Aug date) ->
-                if date.Month.Equals(8) then
-                    date.Month.ToString()
-                else
-                    raise <| ArgumentException "This date is not in August."
+            | (May date) | (Jun date) | (Jul date) | (Aug date) -> date.Month.ToString()
             | MarApr -> (new DateOnly(2024, 4, 1)).Month.ToString()
             | SepOct -> (new DateOnly(2024, 9, 1)).Month.ToString()
 
@@ -230,6 +221,39 @@ module SimpleTypes =
         | Rockies // COL
         | AmericanLeague of Team list
         | NationalLeague of Team list
+
+        static member teamAbbrevs = Map.ofList [
+            (Orioles, "BAL")
+            (BlueJays, "TOR")
+            (Yankees, "NYY")
+            (Rays, "TB")
+            (RedSox, "BOS")
+            (Guardians, "CLE")
+            (WhiteSox, "CWS")
+            (Royals, "KC")
+            (Tigers, "DET")
+            (Twins, "MIN")
+            (Angels, "LAA")
+            (Athletics, "OAK")
+            (Mariners, "SEA")
+            (Rangers, "TEX")
+            (Astros, "HOU")
+            (Braves, "ATL")
+            (Marlins, "MIA")
+            (Mets, "NYM")
+            (Nationals, "WAS")
+            (Phillies, "PHI")
+            (Brewers, "MIL")
+            (Cardinals, "STL")
+            (Cubs, "CHC")
+            (Pirates, "PIT")
+            (Reds, "CIN")
+            (DBacks, "AZ")
+            (Dodgers, "LAD")
+            (Rockies, "COL")
+            (Padres, "SD")
+            (Giants, "SF")
+        ]
 
         static member americanLeague =
             AmericanLeague
@@ -614,7 +638,6 @@ module SimpleTypes =
 
     type QueryParams =
         { pitchType: PitchType list
-          atBats: int
           gameType: GameType list
           gameDateLT: GameDate
           gameDateGT: GameDate }
@@ -622,7 +645,6 @@ module SimpleTypes =
         member this.ToQueryString() =
             seq {
                 yield ("hfPT=" + mkPipeDelim this.pitchType)
-                yield ("&hfAB=" + this.atBats.ToString())
                 yield ("&hfGT=" + mkPipeDelim this.gameType)
                 yield ("&game_date_lt=" + this.gameDateLT.ToString())
                 yield ("&game_date_gt=" + this.gameDateGT.ToString())
