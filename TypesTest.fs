@@ -100,7 +100,6 @@ type TypesTest() =
 
         let qp =
             { pitchType = pitchTypes
-              atBats = atBats
               gameType = gameType
               gameDateLT = gameDateLT
               gameDateGT = gameDateGT }
