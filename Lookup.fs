@@ -2,6 +2,7 @@ namespace Baseball
 
 open FSharp.Data
 open System
+open System.Collections.Generic
 open System.IO
 open System.IO.Compression
 open System.Net.Http
@@ -14,30 +15,50 @@ module Lookup =
 
     let private peoplePattern = new Regex("/people.+csv$")
 
-    let cacheDir =
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + ".fsbaseball"
 
-    type Chadwick = CsvProvider<"~/.fsbaseball/chadwick_register.csv">
+    let cacheDir =
+        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+        + "/.fsbaseball"
+
+    type Chadwick = CsvProvider<Sample="~/.fsbaseball/register-master/data/people-0.csv">
+
+    let mutable csvRows = new List<Chadwick.Row>()
 
     let getCachedFile =
-        if
-            Directory.Exists("~/.fsbaseball")
-            && File.Exists("~/.fsbaseball/chadwick_register.csv")
-        then
-            Some <| Chadwick.Load("~/.fsbaseball/chadwick_register.csv")
+        if Directory.Exists(cacheDir) && File.Exists(cacheDir + "/chadwick_register.csv") then
+            Some <| Chadwick.Load(cacheDir + "/chadwick_register.csv")
         else
             None
 
     let unpackZip =
+
         task {
             let client = new HttpClient()
             let! peopleZip = registerUrl |> client.GetStreamAsync
 
-            let archive = new ZipArchive(peopleZip)
+            let dataDir = cacheDir + "/register-master/data"
+
+            if ``not`` <| Path.Exists(dataDir) then
+                Directory.CreateDirectory(dataDir) |> ignore
+
+            let archive = new ZipArchive(peopleZip) in
 
             for entry in archive.Entries do
-                if ``not`` <| peoplePattern.Match(entry.FullName).Success then
-                    entry |> ignore // need to figure out how to filter these
+                if peoplePattern.Match(entry.FullName).Success then
+                    Path.Join([| cacheDir; entry.FullName |]) |> entry.ExtractToFile
 
-            archive |> _.ExtractToDirectory(cacheDir)
+            let peopleFiles = new DirectoryInfo(dataDir) |> _.EnumerateFiles("*.csv")
+
+            let! csvFiles =
+                peopleFiles
+                |> Seq.map (fun (f: FileInfo) -> f.FullName |> Chadwick.AsyncLoad)
+                |> Async.Parallel
+                |> Async.StartAsTask
+
+            return
+                csvFiles
+                |> Array.map (fun csv -> csv.Rows)
+                |> Seq.concat
+                |> Seq.iter (fun row -> csvRows.Add row)
+                // well this sort of works? need to add the actual Row data
         }
