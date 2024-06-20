@@ -7,6 +7,7 @@ open System.IO
 open System.IO.Compression
 open System.Net.Http
 open System.Text.RegularExpressions
+open System.Threading
 
 module Lookup =
 
@@ -20,12 +21,15 @@ module Lookup =
         Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
         + "/.fsbaseball"
 
-    type Chadwick = CsvProvider<Sample="~/.fsbaseball/register-master/data/people-0.csv">
+    [<Literal>]
+    let sampleFile = __SOURCE_DIRECTORY__ + "/chadwick_sample.csv"
 
-    let mutable csvRows = new List<Chadwick.Row>()
+    type Chadwick = CsvProvider<Sample=sampleFile, AssumeMissingValues=true>
+
+    let mutable csvRows = new List<(string * string * obj)>()
 
     let getCachedFile =
-        if Directory.Exists(cacheDir) && File.Exists(cacheDir + "/chadwick_register.csv") then
+        if File.Exists(cacheDir + "/chadwick_register.csv") then
             Some <| Chadwick.Load(cacheDir + "/chadwick_register.csv")
         else
             None
@@ -41,7 +45,7 @@ module Lookup =
             if ``not`` <| Path.Exists(dataDir) then
                 Directory.CreateDirectory(dataDir) |> ignore
 
-            let archive = new ZipArchive(peopleZip) in
+            use archive = new ZipArchive(peopleZip) in
 
             for entry in archive.Entries do
                 if peoplePattern.Match(entry.FullName).Success then
@@ -49,16 +53,32 @@ module Lookup =
 
             let peopleFiles = new DirectoryInfo(dataDir) |> _.EnumerateFiles("*.csv")
 
-            let! csvFiles =
+            return!
                 peopleFiles
                 |> Seq.map (fun (f: FileInfo) -> f.FullName |> Chadwick.AsyncLoad)
                 |> Async.Parallel
                 |> Async.StartAsTask
-
-            return
-                csvFiles
-                |> Array.map (fun csv -> csv.Rows)
-                |> Seq.concat
-                |> Seq.iter (fun row -> csvRows.Add row)
-                // well this sort of works? need to add the actual Row data
         }
+
+    let private cancellationToken = new CancellationTokenSource(10000)
+
+    let createRegister =
+        task {
+            let! unpacked = unpackZip
+
+            unpacked
+            |> Seq.map _.Rows
+            |> Seq.concat
+            |> Seq.iter (fun (row: Chadwick.Row) -> csvRows.Add <| (row.Name_first, row.Name_last, row.Key_mlbam))
+        }
+        |> _.Wait(cancellationToken.Token)
+
+    let runCreate =
+        try
+            createRegister
+        with
+        | :? AggregateException as ex ->
+            for exc in ex.InnerExceptions do
+                Console.WriteLine exc
+
+    // TODO: write the rows to a file!
