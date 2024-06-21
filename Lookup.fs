@@ -2,7 +2,6 @@ namespace Baseball
 
 open FSharp.Data
 open System
-open System.Collections.Generic
 open System.IO
 open System.IO.Compression
 open System.Net.Http
@@ -14,71 +13,94 @@ module Lookup =
     let private registerUrl =
         "https://github.com/chadwickbureau/register/archive/refs/heads/master.zip"
 
-    let private peoplePattern = new Regex("/people.+csv$")
+    let private peoplePattern = new Regex "/people.+csv$"
 
 
     let cacheDir =
-        Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
-        + "/.fsbaseball"
+        Environment.GetFolderPath Environment.SpecialFolder.UserProfile + "/.fsbaseball"
 
     [<Literal>]
     let sampleFile = __SOURCE_DIRECTORY__ + "/chadwick_sample.csv"
 
     type Chadwick = CsvProvider<Sample=sampleFile, AssumeMissingValues=true>
 
-    let mutable csvRows = new List<(string * string * obj)>()
+    type MlbLookup =
+        CsvProvider<
+            "Ben,Lieberman,12345",
+            Schema="Name_first (string),Name_last (string),Key_mlbam (Nullable<int>)",
+            HasHeaders=false,
+            AssumeMissingValues=true
+         >
 
-    let getCachedFile =
-        if File.Exists(cacheDir + "/chadwick_register.csv") then
-            Some <| Chadwick.Load(cacheDir + "/chadwick_register.csv")
-        else
-            None
+    let getCachedFile = Path.Combine [| cacheDir; "/chadwick_register.csv" |]
+
+    let private cancellationToken = new CancellationTokenSource 10000
 
     let unpackZip =
 
         task {
             let client = new HttpClient()
-            let! peopleZip = registerUrl |> client.GetStreamAsync
 
             let dataDir = cacheDir + "/register-master/data"
 
-            if ``not`` <| Path.Exists(dataDir) then
-                Directory.CreateDirectory(dataDir) |> ignore
+            if not (Path.Exists dataDir) then
+                Directory.CreateDirectory dataDir |> ignore
 
-            use archive = new ZipArchive(peopleZip) in
+            use! peopleZip = registerUrl |> client.GetStreamAsync
+            use archive = new ZipArchive(peopleZip)
 
             for entry in archive.Entries do
                 if peoplePattern.Match(entry.FullName).Success then
-                    Path.Join([| cacheDir; entry.FullName |]) |> entry.ExtractToFile
+                    Path.Join [| cacheDir; entry.FullName |] |> entry.ExtractToFile
 
             let peopleFiles = new DirectoryInfo(dataDir) |> _.EnumerateFiles("*.csv")
 
             return!
                 peopleFiles
-                |> Seq.map (fun (f: FileInfo) -> f.FullName |> Chadwick.AsyncLoad)
+                |> Seq.map (_.FullName >> Chadwick.AsyncLoad)
                 |> Async.Parallel
                 |> Async.StartAsTask
         }
 
-    let private cancellationToken = new CancellationTokenSource(10000)
+
 
     let createRegister =
         task {
+
             let! unpacked = unpackZip
 
-            unpacked
-            |> Seq.map _.Rows
-            |> Seq.concat
-            |> Seq.iter (fun (row: Chadwick.Row) -> csvRows.Add <| (row.Name_first, row.Name_last, row.Key_mlbam))
+            let lookupTable =
+                unpacked
+                |> Seq.map _.Rows
+                |> Seq.concat
+                |> Seq.map (fun row -> new MlbLookup.Row(row.Name_first, row.Name_last, row.Key_mlbam))
+
+            let registerPath = cacheDir + "/chadwick_register.csv"
+
+            task {
+                if not (File.Exists registerPath) then
+                    File.Create(registerPath) |> ignore
+
+                File.WriteAllLines(registerPath, [| "Name_first"; "Name_last"; "Key_mlbam" |])
+            }
+            |> _.Start
+            |> ignore
+
+            new MlbLookup(lookupTable) |> _.Save(registerPath)
         }
         |> _.Wait(cancellationToken.Token)
 
     let runCreate =
-        try
-            createRegister
-        with
-        | :? AggregateException as ex ->
-            for exc in ex.InnerExceptions do
-                Console.WriteLine exc
+        Console.WriteLine "Creating the register file..."
+        createRegister
 
-    // TODO: write the rows to a file!
+    let getRegister =
+        Console.WriteLine "retrieving the Chadwick database, please wait..."
+
+        if Path.Exists getCachedFile then
+            let location = getCachedFile in MlbLookup.Load location
+        else
+            runCreate
+            let location = getCachedFile in
+            // this part here throws a FileNotFoundException
+            MlbLookup.Load location
