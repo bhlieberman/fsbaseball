@@ -6,7 +6,6 @@ open System.IO
 open System.IO.Compression
 open System.Net.Http
 open System.Text.RegularExpressions
-open System.Threading
 
 module Lookup =
 
@@ -33,8 +32,6 @@ module Lookup =
          >
 
     let getCachedFile = Path.Combine [| cacheDir; "/chadwick_register.csv" |]
-
-    let private cancellationToken = new CancellationTokenSource 10000
 
     let unpackZip =
 
@@ -64,7 +61,7 @@ module Lookup =
 
 
 
-    let createRegister =
+    let createRegister() =
         task {
 
             let! unpacked = unpackZip
@@ -77,18 +74,16 @@ module Lookup =
 
             let registerPath = cacheDir + "/chadwick_register.csv"
 
-            task {
-                if not (File.Exists registerPath) then
-                    File.Create(registerPath) |> ignore
+            if not (File.Exists registerPath) then
+                File.Create(registerPath) |> ignore
 
-                File.WriteAllLines(registerPath, [| "Name_first"; "Name_last"; "Key_mlbam" |])
-            }
-            |> _.Start
-            |> ignore
+            async {
+                File.WriteAllLines(registerPath, [| "Name_first,Name_last,Key_mlbam" |])
+                new MlbLookup(lookupTable) |> _.Save(registerPath)
+            } |> Async.RunSynchronously
 
-            new MlbLookup(lookupTable) |> _.Save(registerPath)
         }
-        |> _.Wait(cancellationToken.Token)
+        |> _.Wait(10000)
 
     let runCreate =
         Console.WriteLine "Creating the register file..."
@@ -99,8 +94,9 @@ module Lookup =
 
         if Path.Exists getCachedFile then
             let location = getCachedFile in MlbLookup.Load location
-        else
-            runCreate
+        else if runCreate() then
             let location = getCachedFile in
             // this part here throws a FileNotFoundException
             MlbLookup.Load location
+        else
+            new MlbLookup([])
