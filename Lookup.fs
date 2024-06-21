@@ -31,7 +31,7 @@ module Lookup =
             AssumeMissingValues=true
          >
 
-    let getCachedFile = Path.Combine [| cacheDir; "/chadwick_register.csv" |]
+    let getCachedFile = Path.Join [| cacheDir; "/chadwick_register.csv" |]
 
     let unpackZip =
 
