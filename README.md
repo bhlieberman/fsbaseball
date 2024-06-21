@@ -1,0 +1,3 @@
+# FSharpBaseball
+
+This is an in-progress port of the popular `pybaseball` library to F#. The intention is not to achieve 100% feature parity. Instead, I plan to experiment with F#'s distinctive features like type providers to expose a different angle to working with sabermetrics data than the one currently offered by `pybaseball`. Bear in mind that this is also an educational effort on my part. I am learning F# as I am writing this library. There are guaranteed to be sharp edges, bugs, and subpar choices that will reveal themselves along the way. Feedback, contributions, and constructive commentary are always welcome.
