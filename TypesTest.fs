@@ -1,4 +1,4 @@
-module baseball
+module baseball.TypesTest
 
 open NUnit.Framework
 open System
