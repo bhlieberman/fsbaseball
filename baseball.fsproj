@@ -10,6 +10,7 @@
     <Compile Include="MoreTypes.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="Lookup.fs" />
+    <Compile Include="LookupTest.fs" />
     <Compile Include="Player.fs" />
     <Compile Include="TypesTest.fs" />
     <Compile Include="Program.fs" />
