@@ -61,7 +61,7 @@ module Lookup =
 
 
 
-    let createRegister() =
+    let createRegister () =
         task {
 
             let! unpacked = unpackZip
@@ -77,10 +77,12 @@ module Lookup =
             if not (File.Exists registerPath) then
                 File.Create(registerPath) |> ignore
 
-            async {
-                File.WriteAllLines(registerPath, [| "Name_first,Name_last,Key_mlbam" |])
-                new MlbLookup(lookupTable) |> _.Save(registerPath)
-            } |> Async.RunSynchronously
+            return!
+                async {
+                    File.WriteAllLines(registerPath, [| "Name_first,Name_last,Key_mlbam" |])
+                    new MlbLookup(lookupTable) |> _.Save(registerPath)
+                }
+                |> Async.StartAsTask
 
         }
         |> _.Wait(10000)
@@ -94,9 +96,24 @@ module Lookup =
 
         if Path.Exists getCachedFile then
             let location = getCachedFile in MlbLookup.Load location
-        else if runCreate() then
-            let location = getCachedFile in
-            // this part here throws a FileNotFoundException
-            MlbLookup.Load location
+        else if runCreate () then
+            let location = getCachedFile in MlbLookup.Load location
         else
             new MlbLookup([])
+
+    type PlayerProfile = { name: string; mlbId: int }
+
+    let findPlayer (player_first: string option) (player_last: string option) =
+        // ultimately this function should take a parameter representing the lookup table?
+        // and then it should transform their name and perform the fuzzy search
+        // returning a tuple of if the name has a close match and whether they have an ID in the table?
+        // like Some ("Adley Rutschman", 1234) or Some ("Bob", None) or None
+        let provideEmpty = Option.defaultValue String.Empty >> Some
+
+        (provideEmpty player_first, provideEmpty player_last)
+        ||> Option.map2 (fun fst lst -> fst + lst)
+        |> Option.bind (fun name ->
+            if String.IsNullOrEmpty name then
+                None
+            else
+                { name = name; mlbId = Int32.MaxValue } |> Some)
