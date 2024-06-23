@@ -1,7 +1,9 @@
 namespace Baseball
 
 open FSharp.Data
+open FuzzySharp
 open System
+open System.Collections.Generic
 open System.IO
 open System.IO.Compression
 open System.Net.Http
@@ -25,8 +27,8 @@ module Lookup =
 
     type MlbLookup =
         CsvProvider<
-            "Ben,Lieberman,12345",
-            Schema="Name_first (string),Name_last (string),Key_mlbam (Nullable<int>)",
+            "Ben,Lieberman,12345,",
+            Schema="Name_first (string),Name_last (string),Key_mlbam (Nullable<int>), Whole_name (string option)",
             HasHeaders=false,
             AssumeMissingValues=true
          >
@@ -70,7 +72,7 @@ module Lookup =
                 unpacked
                 |> Seq.map _.Rows
                 |> Seq.concat
-                |> Seq.map (fun row -> new MlbLookup.Row(row.Name_first, row.Name_last, row.Key_mlbam))
+                |> Seq.map (fun row -> new MlbLookup.Row(row.Name_first, row.Name_last, row.Key_mlbam, None))
 
             let registerPath = cacheDir + "/chadwick_register.csv"
 
@@ -106,21 +108,24 @@ module Lookup =
           mlbId: Nullable<int> }
 
         static member create (lookup: MlbLookup) (name: string) =
-            Seq.tryFind
-                (fun (row: MlbLookup.Row) ->
-                    let wholeName = row.Name_first + row.Name_last
-                    wholeName = name)
-                lookup.Rows
-            |> Option.bind (fun row ->
-                Some
-                    { name = row.Name_first + row.Name_last
-                      mlbId = row.``Key_mlbam (Nullable<int>)`` })
+
+            lookup.Rows
+            |> Seq.collect (fun (r: MlbLookup.Row) ->
+                let score = Fuzz.Ratio(name, String.Join(" ", [| r.Name_first; r.Name_last |]))
+
+                Seq.singleton
+                    {| score = score
+                       name = name
+                       id = r.``Key_mlbam (Nullable<int>)`` |})
+            |> Seq.sortByDescending _.score
+            |> Seq.take 5
+            |> Some
 
     let findPlayer (lookup_table: MlbLookup) (player_first: string option) (player_last: string option) =
         let provideEmpty = Option.defaultValue String.Empty >> Some
 
         (provideEmpty player_first, provideEmpty player_last)
-        ||> Option.map2 (fun fst lst -> fst + lst)
+        ||> Option.map2 (fun fst lst -> String.Join(" ", [| fst; lst |]))
         |> Option.bind (fun name -> PlayerProfile.create lookup_table name)
 
     let search = findPlayer getRegister
