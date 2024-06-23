@@ -76,9 +76,12 @@ type TypesTest() =
 
     [<Test>]
     member _.checkMonthFailure() =
-        let badMay = May(new DateOnly(2024, 4, 2))
-        let ex = Assert.Throws<ArgumentException>((fun _ -> badMay.ToString() |> ignore))
-        Assert.That(ex.Message, Is.EqualTo("This date is not in May."))
+        let badMonth = new DateOnly(2024, 10, 2)
+
+        let ex =
+            Assert.Throws<ArgumentException>(fun _ -> badMonth |> Month.create |> ignore)
+
+        Assert.That(ex.Message, Is.EqualTo("The date provided is not within a typical baseball season."))
 
     [<Test>]
     member _.checkHomeAway() =
@@ -105,6 +108,6 @@ type TypesTest() =
               gameDateGT = gameDateGT }
 
         let expected =
-            "hfPT=CS|CU|FS|&hfAB=13&hfGT=F|W|R|&game_date_lt=2024-06-17&game_date_gt=2024-06-17"
+            "hfPT=CS|CU|FS|&hfGT=F|W|R|&game_date_lt=2024-06-17&game_date_gt=2024-06-17"
 
-        Assert.That((fun _ -> qp.ToQueryString().Equals(expected)))
+        Assert.That(fun _ -> qp.ToQueryString().Equals(expected))

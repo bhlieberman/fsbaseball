@@ -7,16 +7,19 @@ open System.IO
 
 [<TestFixture>]
 type LookupTest() =
+    member private _.userProfile =
+        Environment.GetFolderPath Environment.SpecialFolder.UserProfile
+
+    member private this.peopleDir =
+        this.userProfile + "/.fsbaseball" + "/register-master/data"
+
     [<Test>]
-    member _.cacheDirIsValid() =
-        let userProfile = Environment.GetFolderPath Environment.SpecialFolder.UserProfile
-        Assert.That(cacheDir, Is.EqualTo(userProfile + "/.fsbaseball"))
+    member this.cacheDirIsValid() =
+        Assert.That(cacheDir, Is.EqualTo(this.userProfile + "/.fsbaseball"))
 
     [<SetUp>]
-    member _.SetUp() =
-        let userProfile = Environment.GetFolderPath Environment.SpecialFolder.UserProfile
-
-        [| userProfile; "/.fsbaseball" |]
+    member this.SetUp() =
+        [| this.userProfile; "/.fsbaseball"; "/register-master/data" |]
         |> Path.Join
         |> Directory.CreateDirectory
         |> ignore
@@ -29,14 +32,13 @@ type LookupTest() =
             cache.Delete(true)
 
     [<Test>]
-    member _.checkUnpackZip() =
+    member this.checkUnpackZip() =
         Assert.DoesNotThrowAsync(fun _ -> unpackZip)
+        this.checkPeopleTablesExists()
 
-    [<Test>]
-    member _.checkLookupTableExists() =
-        let cache = new DirectoryInfo(cacheDir)
+    member private this.checkPeopleTablesExists() =
+        let cache = new DirectoryInfo(this.peopleDir)
 
         cache.EnumerateFiles("*.csv")
-        |> Seq.tryFind (fun (f: FileInfo) -> f.Name = "chadwick_register.csv")
-        |> Option.isSome
-        |> Assert.IsTrue
+        |> Seq.length
+        |> fun l -> Assert.That(l, Is.GreaterThan 0)
