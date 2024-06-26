@@ -180,11 +180,16 @@ module SimpleTypes =
             | 7 -> Jul d
             | 8 -> Aug d
             | 9 -> SepOct
-            | _ -> raise <| ArgumentException "The date provided is not within a typical baseball season."
+            | _ ->
+                raise
+                <| ArgumentException "The date provided is not within a typical baseball season."
 
         override this.ToString() =
             match this with
-            | (May date) | (Jun date) | (Jul date) | (Aug date) -> date.Month.ToString()
+            | (May date)
+            | (Jun date)
+            | (Jul date)
+            | (Aug date) -> date.Month.ToString()
             | MarApr -> (new DateOnly(2024, 4, 1)).Month.ToString()
             | SepOct -> (new DateOnly(2024, 9, 1)).Month.ToString()
 
@@ -222,38 +227,38 @@ module SimpleTypes =
         | AmericanLeague of Team list
         | NationalLeague of Team list
 
-        static member teamAbbrevs = Map.ofList [
-            (Orioles, "BAL")
-            (BlueJays, "TOR")
-            (Yankees, "NYY")
-            (Rays, "TB")
-            (RedSox, "BOS")
-            (Guardians, "CLE")
-            (WhiteSox, "CWS")
-            (Royals, "KC")
-            (Tigers, "DET")
-            (Twins, "MIN")
-            (Angels, "LAA")
-            (Athletics, "OAK")
-            (Mariners, "SEA")
-            (Rangers, "TEX")
-            (Astros, "HOU")
-            (Braves, "ATL")
-            (Marlins, "MIA")
-            (Mets, "NYM")
-            (Nationals, "WAS")
-            (Phillies, "PHI")
-            (Brewers, "MIL")
-            (Cardinals, "STL")
-            (Cubs, "CHC")
-            (Pirates, "PIT")
-            (Reds, "CIN")
-            (DBacks, "AZ")
-            (Dodgers, "LAD")
-            (Rockies, "COL")
-            (Padres, "SD")
-            (Giants, "SF")
-        ]
+        static member teamAbbrevs =
+            Map.ofList
+                [ (Orioles, "BAL")
+                  (BlueJays, "TOR")
+                  (Yankees, "NYY")
+                  (Rays, "TB")
+                  (RedSox, "BOS")
+                  (Guardians, "CLE")
+                  (WhiteSox, "CWS")
+                  (Royals, "KC")
+                  (Tigers, "DET")
+                  (Twins, "MIN")
+                  (Angels, "LAA")
+                  (Athletics, "OAK")
+                  (Mariners, "SEA")
+                  (Rangers, "TEX")
+                  (Astros, "HOU")
+                  (Braves, "ATL")
+                  (Marlins, "MIA")
+                  (Mets, "NYM")
+                  (Nationals, "WAS")
+                  (Phillies, "PHI")
+                  (Brewers, "MIL")
+                  (Cardinals, "STL")
+                  (Cubs, "CHC")
+                  (Pirates, "PIT")
+                  (Reds, "CIN")
+                  (DBacks, "AZ")
+                  (Dodgers, "LAD")
+                  (Rockies, "COL")
+                  (Padres, "SD")
+                  (Giants, "SF") ]
 
         static member americanLeague =
             AmericanLeague
@@ -637,10 +642,12 @@ module SimpleTypes =
 
 
     type QueryParams =
-        { pitchType: PitchType list
-          gameType: GameType list
-          gameDateLT: GameDate
-          gameDateGT: GameDate }
+        { gameDateLT: GameDate
+          gameDateGT: GameDate
+          pitchType: PitchType list
+          gameType: GameType list }
+
+
 
         member this.ToQueryString() =
             seq {
@@ -650,3 +657,25 @@ module SimpleTypes =
                 yield ("&game_date_gt=" + this.gameDateGT.ToString())
             }
             |> Seq.fold (fun acc s -> acc + s) ""
+
+    module Query =
+        let baseQuery =
+            { gameDateLT = LessThan(DateOnly.FromDateTime(DateTime.Today))
+              gameDateGT = GreaterThan(DateOnly.FromDateTime(DateTime.Today))
+              gameType = List.empty
+              pitchType = List.empty }
+
+    type QueryParamBuilder() =
+        member _.Zero _ = Query.baseQuery
+
+        member _.Yield _ = Query.baseQuery
+
+        [<CustomOperation("pitchType")>]
+        member _.PitchType(query, pt: PitchType list) = { query with pitchType = pt }
+
+        [<CustomOperation("gameType")>]
+        member _.GameType(query, gt: GameType list) = { query with gameType = gt }
+
+    let queryParams = QueryParamBuilder()
+
+    let test = queryParams { pitchType [] }
