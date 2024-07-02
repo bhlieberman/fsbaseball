@@ -87,21 +87,23 @@ module Lookup =
                 |> Async.StartAsTask
 
         }
-        |> _.Wait(10000)
 
     let getRegister =
 
         if Path.Exists getCachedFile then
             Console.WriteLine "Retrieving the cached dataset."
             let location = getCachedFile in
-            MlbLookup.Load location
-        else if createRegister () then
-            Console.WriteLine "retrieving the Chadwick database, please wait..."
-            Console.WriteLine "Creating the register file..."
-            let location = getCachedFile in
-            MlbLookup.Load location
+            MlbLookup.AsyncLoad location
+        else if not (Path.Exists getCachedFile) then
+            try
+                if createRegister () |> _.Wait(10000) then
+                    let location = getCachedFile in MlbLookup.AsyncLoad location
+                else
+                    failwith "Could not load the Chadwick database."
+            with :? Exception ->
+                failwith "Something went wrong retrieving the Chadwick database."
         else
-            new MlbLookup([])
+            failwith "Could not load or retrieve dataset."
 
     type PlayerProfile =
         { name: string
@@ -128,4 +130,4 @@ module Lookup =
         ||> Option.map2 (fun fst lst -> String.Join(" ", [| fst; lst |]))
         |> Option.bind (fun name -> PlayerProfile.create lookup_table name)
 
-    let search = findPlayer getRegister
+    let search = getRegister |> Async.RunSynchronously |> findPlayer
