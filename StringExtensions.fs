@@ -10,6 +10,10 @@ open System.Text.RegularExpressions
 module StringExtensions =
     let private words = new Regex("(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])")
 
+    let mkPipeDelim (ls: 'a list) : string =
+        (String.Empty, ls, (Seq.replicate (List.length ls) "|"))
+        |||> Seq.fold2 (fun acc item delim -> acc + item.ToString() + delim)
+
     type String with
         member this.ToURLCase() =
             let lowerCased = words.Split(this) |> Seq.map (fun s -> s.ToLower()) |> Seq.toArray
