@@ -193,7 +193,7 @@ module SimpleTypes =
             | MarApr -> (new DateOnly(2024, 4, 1)).Month.ToString()
             | SepOct -> (new DateOnly(2024, 9, 1)).Month.ToString()
 
-    type Team = // I think these need to handled like...
+    type Team = // I think these need to be handled like...
         | Orioles // BAL
         | BlueJays // TOR
         | Yankees // NYY
@@ -364,6 +364,8 @@ module SimpleTypes =
             else
                 { venue = None }
 
+        /// a possible candidate for a CE...but for now: constructing it
+        /// on an ad-hoc basis will do
         static member fromAbbrevOrFullName(?abbrev, ?fullName) =
             let abbrev' =
                 match abbrev with
@@ -428,6 +430,11 @@ module SimpleTypes =
                   SwingingStrikeBlocked ]
 
         static member swingAndMiss = SwingAndMiss [ FoulTip; SwingingStrike; SwingingStrikeBlocked ]
+
+        override this.ToString() =
+            match this with
+            | AllSwings l
+            | SwingAndMiss l -> l |> Seq.map (sprintf "%A") |> String.concat ""
 
     type GamedayZones = // hfZ -- pipe-delimited ints
         { zones: int list }
@@ -645,25 +652,41 @@ module SimpleTypes =
         { gameDateLT: GameDate
           gameDateGT: GameDate
           pitchType: PitchType list
-          gameType: GameType list }
+          pitchResult: PitchResult list
+          gameType: GameType list
+          paResult: PAResult list
+          month: Month list
+          team: string list
+          homeRoad: HomeAway option }
 
 
 
         member this.ToQueryString() =
             seq {
-                yield ("hfPT=" + mkPipeDelim this.pitchType)
-                yield ("&hfGT=" + mkPipeDelim this.gameType)
-                yield ("&game_date_lt=" + this.gameDateLT.ToString())
-                yield ("&game_date_gt=" + this.gameDateGT.ToString())
+                ("hfPT=" + mkPipeDelim this.pitchType)
+                ("&hfGT=" + mkPipeDelim this.gameType)
+                ("&game_date_lt=" + this.gameDateLT.ToString())
+                ("&game_date_gt=" + this.gameDateGT.ToString())
+                ("&hfMonth=" + mkPipeDelim this.month)
+                ("&home_road" + this.homeRoad.Value.ToString())
+                // ("&hfPR" + (this.pitchResult |> Seq.map (fun (pr: PitchResult) -> pr.ToString().DotDot())))
             }
             |> Seq.fold (fun acc s -> acc + s) ""
 
     module Query =
+        let (lt, gt) =
+            GameDate.create (DateOnly.FromDateTime DateTime.Today, DateOnly.FromDateTime DateTime.Today)
+
         let baseQuery =
-            { gameDateLT = LessThan(DateOnly.FromDateTime(DateTime.Today))
-              gameDateGT = GreaterThan(DateOnly.FromDateTime(DateTime.Today))
+            { gameDateLT = lt
+              gameDateGT = gt
               gameType = List.empty
-              pitchType = List.empty }
+              pitchType = List.empty
+              paResult = List.empty
+              pitchResult = List.empty
+              month = List.empty
+              team = List.empty
+              homeRoad = None }
 
     type QueryParamBuilder() =
         member _.Zero _ = Query.baseQuery
@@ -676,6 +699,54 @@ module SimpleTypes =
         [<CustomOperation("gameType")>]
         member _.GameType(query, gt: GameType list) = { query with gameType = gt }
 
+        [<CustomOperation("paResult")>]
+        member _.PAResult(query, pa: PAResult list) = { query with paResult = pa }
+
+        [<CustomOperation("month")>]
+        member _.Month(query, mo: Month list) = { query with month = mo }
+
+        [<CustomOperation("month")>]
+        member _.Month(query, mo: DateOnly list) =
+            { query with
+                month = List.map Month.create mo }
+
+        [<CustomOperation("month")>]
+        member _.Month(query, mo: string list) =
+            let formats = [| "MMMM yyyy"; "yyyy-MM-dd"; "M/d/yyyy"; "MM/dd/yyyy" |]
+
+            let months =
+                seq {
+                    let rd = ref DateOnly.MinValue
+
+                    for date in mo do
+                        if DateOnly.TryParseExact(date, formats, rd) then
+                            Month.create rd.Value
+                }
+                |> Seq.toList
+
+            { query with month = months }
+
+        [<CustomOperation("teams")>]
+        member _.Team(query, teams: Team list) =
+            let abbrevs =
+                seq { for team in teams -> Team.teamAbbrevs.TryFind team }
+                |> Seq.filter Option.isSome
+                |> Seq.map _.Value
+                |> Seq.toList
+
+            { query with team = abbrevs }
+
+        [<CustomOperation("pitches")>]
+        member _.PitchResults(query, pitches: PitchResult list) = { query with pitchResult = pitches }
+
+
     let queryParams = QueryParamBuilder()
 
-    let test = queryParams { pitchType [] }
+    let test =
+        queryParams {
+            pitchType []
+            month [ "May 2023"; "June 2016"; "6/13/2020" ]
+            teams [ Guardians; Orioles ]
+            pitches [ Ball; Pitchout ]
+
+        }
