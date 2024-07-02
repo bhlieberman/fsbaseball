@@ -16,7 +16,12 @@ module Scratch =
         { pitchType = pitchTypes
           gameType = gameType
           gameDateLT = gameDateLT
-          gameDateGT = gameDateGT }
+          gameDateGT = gameDateGT
+          paResult = []
+          month = []
+          team = []
+          pitchResult = []
+          homeRoad = None }
 
     [<EntryPoint>]
     let main argv =
