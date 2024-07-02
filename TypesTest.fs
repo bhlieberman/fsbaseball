@@ -105,7 +105,12 @@ type TypesTest() =
             { pitchType = pitchTypes
               gameType = gameType
               gameDateLT = gameDateLT
-              gameDateGT = gameDateGT }
+              gameDateGT = gameDateGT
+              paResult = []
+              month = []
+              team = []
+              pitchResult = []
+              homeRoad = None }
 
         let expected =
             "hfPT=CS|CU|FS|&hfGT=F|W|R|&game_date_lt=2024-06-17&game_date_gt=2024-06-17"
